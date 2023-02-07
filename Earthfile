@@ -6,8 +6,7 @@ deps:
     ENV BIN_NAME encryptdir
 
     WORKDIR /app
-    #COPY go.mod go.sum .
-    COPY go.mod  .
+    COPY go.mod go.sum .
     RUN go mod download
 
 # builds the client binary

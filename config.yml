@@ -1,0 +1,13 @@
+key_size: 128
+public_key: "file_name" # file to store public key
+private_key: "file_name" # file to store private key
+aes_key: "file_name" # the AES key is encrypted using the private key
+directories:
+    - Documents
+    - Downloads
+    - Pictures
+files:
+    - exe
+    - docx
+    - pdf
+    - xlsx
