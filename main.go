@@ -1,14 +1,18 @@
 package main
 
 import (
-	"encryptdir/pkg/encryptdir"
+	"flag"
 	"fmt"
 	"os"
+
+	"encryptdir/pkg/encryptdir"
 )
 
 func main() {
-	err := encryptdir.Run()
+	var configPath = flag.String("config", "config.yml", "config file to read from")
+
+	err := encryptdir.Run(*configPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "encryptdir failed to start: %s", err)
+		fmt.Fprintf(os.Stderr, "encryptdir error: %s\n", err)
 	}
 }
