@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"fmt"
 
+	"github.com/prairir/encryptdir/pkg/aes"
 	"github.com/prairir/encryptdir/pkg/config"
 )
 
@@ -20,6 +21,9 @@ func Run(configPath string) error {
 	}
 
 	c.RSAKey = rsakey
+
+	lenExtensions := len(c.Files)
+	c.AESKeys, err = aes.GenKeyList(lenExtensions)
 
 	fmt.Printf("hi\nconfig path: %s\nconfig: %#v\n", configPath, c)
 	return nil
