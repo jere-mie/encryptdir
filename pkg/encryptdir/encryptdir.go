@@ -23,8 +23,13 @@ func Run(configPath string) error {
 	c.RSAKey = rsakey
 
 	lenExtensions := len(c.Files)
-	c.AESKeys, err = aes.GenKeyList(lenExtensions)
+	c.AESKeys, err = aes.GenKeyList(uint64(c.KeySize), lenExtensions)
 
 	fmt.Printf("hi\nconfig path: %s\nconfig: %#v\n", configPath, c)
 	return nil
+}
+
+// writes aes and rsa keys
+func writeKeys(c config.Config) error {
+
 }
