@@ -37,9 +37,9 @@ func GenKeyList(length int) ([][]byte, error) {
 	return keyList, nil
 }
 
-// aes.GenKey: generate a random aes key of length `size`
+// aes.GenKey: generate a random aes key of length `size` in bits
 func GenKey(size uint) ([]byte, error) {
-	key := make([]byte, size)
+	key := make([]byte, size/8)
 
 	_, err := rand.Read(key)
 	if err != nil {
