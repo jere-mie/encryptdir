@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"encryptdir/pkg/encryptdir"
+	"github.com/prairir/encryptdir/pkg/encryptdir"
 )
 
 func main() {

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"crypto/rsa"
 	"fmt"
 
 	"github.com/knadh/koanf"
@@ -9,14 +10,19 @@ import (
 )
 
 type Config struct {
+	// FROM CONFIG FILE
 	KeySize int `koanf:"key_size"`
 
-	PublicKey  string `koanf:"public_key"`
-	PrivateKey string `koanf:"private_key"`
-	AESKey     string `koanf:"aes_key"`
+	PublicKeyFile  string `koanf:"public_key"`
+	PrivateKeyFile string `koanf:"private_key"`
+	AESKeyFile     string `koanf:"aes_key"`
 
 	Directories []string `koanf:"directories"`
 	Files       []string `koanf:"files"`
+
+	// FROM OTHER STUFF
+	RSAKey  *rsa.PrivateKey
+	AESKeys [][]byte
 }
 
 // config.New: load `configPath` into `config.Config`

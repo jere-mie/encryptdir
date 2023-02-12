@@ -1,4 +1,5 @@
-module encryptdir
+module github.com/prairir/encryptdir
+
 
 go 1.20
 
