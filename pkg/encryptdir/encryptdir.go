@@ -7,16 +7,21 @@ import (
 
 	"github.com/prairir/encryptdir/pkg/aes"
 	"github.com/prairir/encryptdir/pkg/config"
+	"go.uber.org/zap"
 )
 
-func Run(configPath string, password string, decrypt bool) error {
+func Run(log *zap.SugaredLogger, configPath string, password string, decrypt bool) error {
 
-	c, err := Startup(configPath)
+	_, err := Startup(configPath)
 	if err != nil {
 		return fmt.Errorf("encryptdir.Run: encryptdir.Startup: %w", err)
 	}
 
-	fmt.Printf("config path: %s\npasswd: %s\ndecrypt: %v\n\nconfig: %#v\n", configPath, password, decrypt, c)
+	log.Info("flag and config debug",
+		zap.String("config path", configPath),
+		zap.String("password", password),
+		zap.Bool("decrypt", decrypt),
+	)
 	return nil
 }
 
