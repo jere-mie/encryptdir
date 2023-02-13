@@ -7,6 +7,7 @@ import (
 
 	"github.com/prairir/encryptdir/pkg/encryptdir"
 	"github.com/prairir/encryptdir/pkg/log"
+	"golang.org/x/term"
 )
 
 func Run() error {
@@ -27,6 +28,17 @@ func Run() error {
 
 	if !(*quiet) {
 		fmt.Printf("hi: %v\n", *quiet)
+	}
+
+	// getting password if it isn't passed in
+	if len(*password) == 0 {
+		fmt.Print("Enter Password: ")
+		bytepw, err := term.ReadPassword(int(os.Stdin.Fd()))
+		if err != nil {
+			os.Exit(1)
+		}
+		*password = string(bytepw)
+		fmt.Print("\n")
 	}
 
 	err := encryptdir.Run(zlog, *configPath, *password, *decrypt)
