@@ -1,17 +1,15 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 
-	"github.com/prairir/encryptdir/pkg/encryptdir"
+	"github.com/prairir/encryptdir/cmd"
 )
 
 func main() {
-	var configPath = flag.String("config", "config.yml", "config file to read from")
 
-	err := encryptdir.Run(*configPath)
+	err := cmd.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "encryptdir error: %s\n", err)
 	}

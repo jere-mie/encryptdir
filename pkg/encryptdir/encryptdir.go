@@ -9,15 +9,26 @@ import (
 	"github.com/prairir/encryptdir/pkg/config"
 )
 
-func Run(configPath string) error {
+func Run(configPath string, password string, decrypt bool) error {
+
+	c, err := Startup(configPath)
+	if err != nil {
+		return fmt.Errorf("encryptdir.Run: encryptdir.Startup: %w", err)
+	}
+
+	fmt.Printf("config path: %s\npasswd: %s\ndecrypt: %v\n\nconfig: %#v\n", configPath, password, decrypt, c)
+	return nil
+}
+
+func Startup(configPath string) (*config.Config, error) {
 	c, err := config.New(configPath)
 	if err != nil {
-		return fmt.Errorf("encryptdir.Run: config.New: %w", err)
+		return nil, fmt.Errorf("encryptdir.Run: config.New: %w", err)
 	}
 
 	rsakey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return fmt.Errorf("encryptdir.Run: rsa.GenerateKey: %w", err)
+		return nil, fmt.Errorf("encryptdir.Run: rsa.GenerateKey: %w", err)
 	}
 
 	c.RSAKey = rsakey
@@ -25,11 +36,5 @@ func Run(configPath string) error {
 	lenExtensions := len(c.Files)
 	c.AESKeys, err = aes.GenKeyList(uint64(c.KeySize), lenExtensions)
 
-	fmt.Printf("hi\nconfig path: %s\nconfig: %#v\n", configPath, c)
-	return nil
-}
-
-// writes aes and rsa keys
-func writeKeys(c config.Config) error {
-
+	return c, nil
 }

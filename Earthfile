@@ -17,7 +17,7 @@ build-bin:
 
     # copy cmd and whatever else in dir mode
     # this is like `cp -r`
-    COPY --dir pkg/ ./
+    COPY --dir pkg/ cmd/ ./
 
     # build to file `imacry`
     RUN go build -race -o $BIN_NAME main.go
