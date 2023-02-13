@@ -8,7 +8,7 @@ For binary:
 `earthly +build`
 
 For container:
-`earthly +build-image`
+`earthly +use-image`
 
 For testing
 `earthly +build-test`

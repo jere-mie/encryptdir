@@ -22,8 +22,27 @@ build-bin:
     # build to file `imacry`
     RUN go build -race -o $BIN_NAME main.go
 
+    SAVE ARTIFACT $BIN_NAME
+
 # saves binary
 build:
     FROM +build-bin
     # save file as artifact
     SAVE ARTIFACT $BIN_NAME AS LOCAL $BIN_NAME
+
+build-image-base:
+    FROM ubuntu:23.04
+
+    COPY +build-bin/$BIN_NAME .
+
+    COPY config.yml .
+
+# puts you in interactive shell inside container,
+# spits out image of that container
+use-image:
+    FROM +build-image-base
+
+    # put you in interactive bash shell
+    RUN --interactive bash
+
+    SAVE IMAGE encryptdir-interactive:latest
