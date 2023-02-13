@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"syscall"
-
 	"github.com/prairir/encryptdir/pkg/encryptdir"
 	"github.com/prairir/encryptdir/pkg/log"
 	"golang.org/x/term"
@@ -35,7 +33,7 @@ func Run() error {
 	// getting password if it isn't passed in
 	if len(*password) == 0 {
 		fmt.Print("Enter Password: ")
-		bytepw, err := term.ReadPassword(int(syscall.Stdin))
+		bytepw, err := term.ReadPassword(int(os.Stdin.Fd()))
 		if err != nil {
 			os.Exit(1)
 		}
