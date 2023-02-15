@@ -21,8 +21,8 @@ type Config struct {
 	Files       []string `koanf:"files"`
 
 	// FROM OTHER STUFF
-	RSAKey  *rsa.PrivateKey
-	AESKeys [][]byte
+	RSAKey    *rsa.PrivateKey
+	AESKeyMap map[string][]byte
 }
 
 // config.New: load `configPath` into `config.Config`
