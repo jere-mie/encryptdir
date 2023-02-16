@@ -1,9 +1,14 @@
 package rsa
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
+	"io"
+	"os"
 )
 
 func GetKey(privKeyPath string, pubKeyPath string, password string) (*rsa.PrivateKey, error) {
@@ -11,7 +16,7 @@ func GetKey(privKeyPath string, pubKeyPath string, password string) (*rsa.Privat
 	// try reading the private key
 	privkey, err := ReadPrivateKey(privKeyPath, password)
 	if err != nil {
-		privkey, err := NewKeys(privKeyPath, pubKeyPath, password)
+		privkey, err = NewKeys(privKeyPath, pubKeyPath, password)
 		if err != nil {
 			return nil, fmt.Errorf("rsa.GetKey: %w", err)
 		}
@@ -20,7 +25,7 @@ func GetKey(privKeyPath string, pubKeyPath string, password string) (*rsa.Privat
 	// try reading the public key
 	pubkey, err := ReadPublicKey(privKeyPath)
 	if err != nil {
-		privkey, err := NewKeys(privKeyPath, pubKeyPath, password)
+		privkey, err = NewKeys(privKeyPath, pubKeyPath, password)
 		if err != nil {
 			return nil, fmt.Errorf("rsa.GetKey: %w", err)
 		}
@@ -35,11 +40,56 @@ func GetKey(privKeyPath string, pubKeyPath string, password string) (*rsa.Privat
 }
 
 func ReadPrivateKey(path string, password string) (*rsa.PrivateKey, error) {
-	return nil, nil
+	in, err := os.OpenFile(path, os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("rsa.ReadPrivateKey: os.OpenFile: %w", err)
+	}
+	defer in.Close()
+
+	encPayload, err := io.ReadAll(in)
+	if err != nil {
+		return nil, fmt.Errorf("rsa.ReadPrivateKey: io.ReadAll: %w", err)
+	}
+
+	block, _ := pem.Decode(encPayload)
+	if block == nil {
+		return nil, fmt.Errorf("rsa.ReadPrivateKey: pem.Decode: %w", err)
+	}
+
+	decrypted, err := x509.DecryptPEMBlock(block, []byte(password))
+	if err != nil {
+		return nil, fmt.Errorf("rsa.ReadPrivateKey: x509.DecryptPEMBlock: %w", err)
+	}
+
+	privateKey, err := x509.ParsePKCS1PrivateKey(decrypted)
+	if err != nil {
+		return nil, fmt.Errorf("rsa.ReadPrivateKey: x509.ParsePKCS1PrivateKey: %w", err)
+	}
+	return privateKey, nil
 }
 
 func ReadPublicKey(path string) (*rsa.PublicKey, error) {
-	return nil, nil
+	in, err := os.OpenFile(path, os.O_RDONLY, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("rsa.ReadPublicKey: os.OpenFile: %w", err)
+	}
+	defer in.Close()
+
+	encPayload, err := io.ReadAll(in)
+	if err != nil {
+		return nil, fmt.Errorf("rsa.ReadPublicKey: io.ReadAll: %w", err)
+	}
+
+	block, _ := pem.Decode(encPayload)
+	if block == nil {
+		return nil, fmt.Errorf("rsa.ReadPublicKey: pem.Decode: %w", err)
+	}
+
+	publicKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("rsa.ReadPublicKey: x509.ParsePKCS1PrivateKey: %w", err)
+	}
+	return publicKey, nil
 }
 
 func NewKeys(privKeyPath string, pubKeyPath string, password string) (*rsa.PrivateKey, error) {
@@ -58,5 +108,75 @@ func NewKeys(privKeyPath string, pubKeyPath string, password string) (*rsa.Priva
 }
 
 func WriteKeysToFiles(privateKey *rsa.PrivateKey, privPath string, pubPath string, password string) error {
+	// create file, error if already exist
+	outPriv, err := os.OpenFile(privPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		return fmt.Errorf("rsa.WriteKeysToFiles: os.OpenFile: outpath = %q : %w", privPath, err)
+	}
+	defer outPriv.Close()
+
+	// create file, error if already exist
+	outPub, err := os.OpenFile(pubPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		return fmt.Errorf("rsa.WriteKeysToFiles: os.OpenFile: outpath = %q : %w", pubPath, err)
+	}
+	defer outPub.Close()
+
+	privBlock := &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}
+
+	pubBlock := &pem.Block{
+		Type:  "RSA PUBLIC KEY",
+		Bytes: x509.MarshalPKCS1PublicKey(&privateKey.PublicKey),
+	}
+
+	// Encrypt the private key
+	privBlock, err = x509.EncryptPEMBlock(rand.Reader, privBlock.Type, privBlock.Bytes, []byte(password), x509.PEMCipherAES256)
+	if err != nil {
+		return err
+	}
+
+	// write the private key
+	err = pem.Encode(outPriv, privBlock)
+	if err != nil {
+		return fmt.Errorf("rsa.WriteKeysToFiles: pem.Encode: outpath = %q : %w", privPath, err)
+	}
+
+	// write the public key
+	err = pem.Encode(outPub, pubBlock)
+	if err != nil {
+		return fmt.Errorf("rsa.WriteKeysToFiles: pem.Encode: outpath = %q : %w", pubPath, err)
+	}
+
+	return nil
+}
+
+// rsa.CreateSignature: hashes `payload` with `hashAlgo` then signs hashed `payload` with `key`
+// returns: signature or error
+func CreateSignature(key *rsa.PrivateKey, payload []byte, hashAlgo crypto.Hash) ([]byte, error) {
+	h := hashAlgo.HashFunc().New()
+
+	// doesnt return error
+	h.Write(payload)
+
+	signature, err := rsa.SignPKCS1v15(nil, key, hashAlgo, h.Sum(nil)[:])
+	if err != nil {
+		return nil, fmt.Errorf("rsa.CreateSignature: rsa.SignPKCS1v15: %w", err)
+	}
+	return signature, nil
+}
+
+// if err happens, signature isnt verified
+func VerifySignature(key *rsa.PublicKey, signature []byte, payload []byte, hashAlgo crypto.Hash) error {
+	h := hashAlgo.HashFunc().New()
+
+	h.Write(payload)
+
+	err := rsa.VerifyPKCS1v15(key, hashAlgo, h.Sum(nil)[:], signature)
+	if err != nil {
+		return fmt.Errorf("rsa.VerifySignature: rsa.VerifyPKCS1v15: %w", err)
+	}
 	return nil
 }
