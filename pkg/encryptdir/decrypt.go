@@ -15,9 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func encrypt(log *zap.SugaredLogger,
-	privKey *gorsa.PrivateKey,
-	keyMap map[string][]byte,
+func decrypt(log *zap.SugaredLogger,
+	privKey *gorsa.PrivateKey, keyMap map[string][]byte,
 	directories []string,
 ) error {
 	w := Walker{
@@ -28,7 +27,7 @@ func encrypt(log *zap.SugaredLogger,
 	errC := make(chan error, 0)
 
 	for _, dir := range directories {
-		go func(dir string) { errC <- cwalk.Walk(dir, w.encryptWalk) }(dir)
+		go func(dir string) { errC <- cwalk.Walk(dir, w.decryptWalk) }(dir)
 	}
 
 	// best way to handle the errors
@@ -50,48 +49,43 @@ func encrypt(log *zap.SugaredLogger,
 	return nil
 }
 
-type Walker struct {
-	privKey *gorsa.PrivateKey
-
-	keyMap map[string][]byte
-}
-
-func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
+func (w Walker) decryptWalk(path string, info os.FileInfo, err error) error {
 	if err != nil {
 		return nil
 	}
 
 	errC := make(chan error, 1)
+
 	go func(path string, info os.FileInfo, privKey *gorsa.PrivateKey, keyMap map[string][]byte, errChan chan error) {
-		// dont touch dirs
-		if info.IsDir() {
+		if info.IsDir() { // skip dirs
 			errChan <- nil
 			return
 		}
 
-		encFile, err := os.OpenFile(path+".enc", os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode())
+		decFile, err := os.OpenFile(path+".dec", os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode())
 		if err != nil {
-			// if `.enc` file already exists, another goroutine is touching
-			// the file, so move on
+			// if `.dec` file already exists, another goroutine is touchine
+			// so move on
 			if errors.Is(err, os.ErrExist) {
 				errChan <- nil
 				return
 			}
 
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: os.OpenFile: %w", err)
+			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk: os.OpenFile: %w", err)
 			return
 		}
-		defer encFile.Close()
+		defer decFile.Close()
 
-		plainFile, err := os.OpenFile(path, os.O_RDONLY, info.Mode())
+		cipherFile, err := os.OpenFile(path, os.O_RDONLY, info.Mode())
 		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: os.OpenFile: %w", err)
+			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk: os.OpenFile: %w", err)
 			return
 		}
-		defer plainFile.Close()
+		defer cipherFile.Close()
 
 		ext := filepath.Ext(path)
 		key, ok := keyMap[ext]
+
 		// skip this file if not in key map
 		if !ok {
 			errChan <- nil
@@ -99,51 +93,39 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 		}
 
 		sig := make([]byte, crypto.MD5.Size())
-		_, err = plainFile.Read(sig)
+		_, err = cipherFile.Read(sig)
 		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: plainFile.Read: %w", err)
+			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk: cipherFile.Read: %w", err)
 			return
 		}
 
 		err = rsa.VerifySignature(&privKey.PublicKey, sig, key, crypto.MD5)
-		if err == nil { // means signature verified and already encrypted
+		if err != nil { // means signature isnt valid, meaning decrypted
 			errChan <- nil
 			return
 		}
 
-		wSig, err := rsa.CreateSignature(privKey, key, crypto.MD5)
+		cipher, err := io.ReadAll(cipherFile)
 		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: rsa.CreateSignature: %w", err)
+			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk: io.ReadAll: %w", err)
 			return
 		}
 
-		_, err = encFile.Write(wSig)
+		plain, err := aes.Decrypt(key, cipher)
 		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: encFile.Write(wSig): %w", err)
+			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk: aes.Decrypt: %w", err)
 			return
 		}
 
-		plain, err := io.ReadAll(plainFile)
+		_, err = decFile.Write(plain)
 		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: io.ReadAll: %w", err)
+			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk:  decFile.Write: %w", err)
 			return
 		}
 
-		cipher, err := aes.Encrypt(key, plain)
+		err = os.Rename(path+".dec", path)
 		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: aes.Encrypt: %w", err)
-			return
-		}
-
-		_, err = encFile.Write(cipher)
-		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: encFile.Write: %w", err)
-			return
-		}
-
-		err = os.Rename(path+".enc", path)
-		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: os.Rename: %w", err)
+			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk:  os.Rename: %w", err)
 			return
 		}
 

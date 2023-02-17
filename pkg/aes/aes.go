@@ -7,6 +7,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	gorsa "crypto/rsa"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -187,6 +188,12 @@ func Encrypt(key []byte, plaintext []byte) ([]byte, error) {
 		plaintext = append(plaintext, padding...)
 	}
 
+	origSize := uint64(len(plaintext))
+	err = binary.Write(&cipherBuf, binary.LittleEndian, &origSize)
+	if err != nil {
+		return nil, fmt.Errorf("aes.Encrypt: binary.Write: %w", err)
+	}
+
 	iv := make([]byte, cipherBlock.BlockSize())
 	if _, err = io.ReadFull(rand.Reader, iv); err != nil {
 		return nil, fmt.Errorf("aes.Encrypt: io.ReadFull(rand.Reader, io): %w", err)
@@ -221,4 +228,52 @@ func Encrypt(key []byte, plaintext []byte) ([]byte, error) {
 	}
 
 	return cipherBuf.Bytes(), nil
+}
+
+func Decrypt(key []byte, ciphertext []byte) ([]byte, error) {
+	var plainBuf bytes.Buffer
+
+	cipherBuf := bytes.NewReader(ciphertext)
+
+	cipherBlock, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("aes.Decrypt: aes.NewCipher: %w", err)
+	}
+
+	var origSize uint64
+	err = binary.Read(cipherBuf, binary.LittleEndian, &origSize)
+	if err != nil {
+		return nil, fmt.Errorf("aes.Decrypt: binary.Read: %w", err)
+	}
+
+	iv := make([]byte, cipherBlock.BlockSize())
+	if _, err := cipherBuf.Read(iv); err != nil {
+		return nil, fmt.Errorf("aes.Decrypt: io.ReadFull(rand.Reader, io): %w", err)
+	}
+
+	buf := make([]byte, aes.BlockSize)
+
+	stream := cipher.NewCTR(cipherBlock, iv)
+
+	for {
+		n, err := cipherBuf.Read(buf)
+		if n > 0 {
+			stream.XORKeyStream(buf, buf[:n])
+			_, err := plainBuf.Write(buf[:n])
+			if err != nil {
+				return nil, fmt.Errorf("aes.Decrypt: plainBuf.Write: %w", err)
+			}
+		}
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("aes.Decrypt: cipherBuf.Read: %w", err)
+		}
+	}
+
+	return plainBuf.Bytes()[:origSize], nil // TODO: this may not be right, verify number
+
 }
