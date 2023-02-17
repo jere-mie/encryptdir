@@ -23,7 +23,7 @@ func GetKey(privKeyPath string, pubKeyPath string, password string) (*rsa.Privat
 		return privkey, nil
 	}
 	// try reading the public key
-	pubkey, err := ReadPublicKey(privKeyPath)
+	pubkey, err := ReadPublicKey(pubKeyPath)
 	if err != nil {
 		privkey, err = NewKeys(privKeyPath, pubKeyPath, password)
 		if err != nil {
@@ -33,7 +33,7 @@ func GetKey(privKeyPath string, pubKeyPath string, password string) (*rsa.Privat
 	}
 
 	// ensuring the computed pubkey is equivalent to the read pubkey
-	if !(pubkey.Equal(privkey.PublicKey)) {
+	if !(pubkey.Equal(&privkey.PublicKey)) {
 		return nil, fmt.Errorf("rsa.GetKey: public key does not match private key")
 	}
 	return privkey, nil
@@ -53,7 +53,7 @@ func ReadPrivateKey(path string, password string) (*rsa.PrivateKey, error) {
 
 	block, _ := pem.Decode(encPayload)
 	if block == nil {
-		return nil, fmt.Errorf("rsa.ReadPrivateKey: pem.Decode: %w", err)
+		return nil, fmt.Errorf("rsa.ReadPrivateKey: pem.Decode: no private key found")
 	}
 
 	decrypted, err := x509.DecryptPEMBlock(block, []byte(password))
@@ -82,7 +82,7 @@ func ReadPublicKey(path string) (*rsa.PublicKey, error) {
 
 	block, _ := pem.Decode(encPayload)
 	if block == nil {
-		return nil, fmt.Errorf("rsa.ReadPublicKey: pem.Decode: %w", err)
+		return nil, fmt.Errorf("rsa.ReadPublicKey: pem.Decode: no public key found")
 	}
 
 	publicKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
