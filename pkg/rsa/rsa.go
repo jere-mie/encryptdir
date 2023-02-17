@@ -127,14 +127,14 @@ func WriteKeysToFiles(privateKey *rsa.PrivateKey, privPath string, pubPath strin
 	// create file, error if already exist
 	outPriv, err := os.OpenFile(privPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
-		return fmt.Errorf("rsa.WriteKeysToFiles: os.OpenFile: outpath = %q : %w", privPath, err)
+		return fmt.Errorf("rsa.WriteKeysToFiles: os.OpenFile: privPath = %q : %w", privPath, err)
 	}
 	defer outPriv.Close()
 
 	// create file, error if already exist
 	outPub, err := os.OpenFile(pubPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
 	if err != nil {
-		return fmt.Errorf("rsa.WriteKeysToFiles: os.OpenFile: outpath = %q : %w", pubPath, err)
+		return fmt.Errorf("rsa.WriteKeysToFiles: os.OpenFile: pubPath = %q : %w", pubPath, err)
 	}
 	defer outPub.Close()
 
@@ -151,7 +151,7 @@ func WriteKeysToFiles(privateKey *rsa.PrivateKey, privPath string, pubPath strin
 	// Encrypt the private key
 	privBlock, err = x509.EncryptPEMBlock(rand.Reader, privBlock.Type, privBlock.Bytes, []byte(password), x509.PEMCipherAES256)
 	if err != nil {
-		return err
+		return fmt.Errorf("rsa.WriteKeysToFiles: x509.EncryptPEMBlock: %w", err)
 	}
 
 	// write the private key

@@ -35,7 +35,7 @@ func Startup(log *zap.SugaredLogger, configPath string, password string) (*confi
 
 	rsakey, err := rsa.GetRSAKey(c.PrivateKeyFile, c.PublicKeyFile, password)
 	if err != nil {
-		return nil, fmt.Errorf("encryptdir.Run: rsa.GetKey: %w", err)
+		return nil, fmt.Errorf("encryptdir.Run: rsa.GetRSAKey: %w", err)
 	}
 
 	c.RSAKey = rsakey
@@ -61,7 +61,7 @@ func getAESKeys(log *zap.SugaredLogger,
 			return nil, fmt.Errorf("encryptdir.Run: aes.ReadKeys: %w", err)
 		}
 
-		log.Info("No keys found, generating them...")
+		log.Info("No AES keys found, generating them...")
 
 		keyList, err := aes.GenKeyList(keySize, len(fileList))
 		if err != nil {
