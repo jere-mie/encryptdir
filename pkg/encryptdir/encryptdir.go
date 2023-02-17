@@ -30,21 +30,28 @@ func Run(log *zap.SugaredLogger, configPath string, password string, decrypt boo
 func Startup(log *zap.SugaredLogger, configPath string, password string) (*config.Config, error) {
 	c, err := config.New(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("encryptdir.Run: config.New: %w", err)
+		return nil, fmt.Errorf("encryptdir.Startup: config.New: %w", err)
 	}
 
 	rsakey, err := rsa.GetRSAKey(c.PrivateKeyFile, c.PublicKeyFile, password)
 	if err != nil {
-		return nil, fmt.Errorf("encryptdir.Run: rsa.GetRSAKey: %w", err)
+		return nil, fmt.Errorf("encryptdir.Startup: rsa.GetRSAKey: %w", err)
 	}
 
 	c.RSAKey = rsakey
 
 	c.AESKeyMap, err = getAESKeys(log, c.RSAKey, c.AESKeyFile, uint64(c.KeySize), c.Files)
 	if err != nil {
-		return nil, fmt.Errorf("encryptdir.Run: encryptdir.getAESKeys: %w", err)
+		return nil, fmt.Errorf("encryptdir.Startup: encryptdir.getAESKeys: %w", err)
 	}
 
+	// if its already written then we dont care
+	err = aes.WriteKeys(c.AESKeyMap, c.RSAKey, c.AESKeyFile)
+	if err != nil && !errors.Is(err, os.ErrExist) {
+		return nil, fmt.Errorf("encryptdir.Startup: aes.WriteKeys: %w", err)
+	}
+
+	log.Infof("config: %#v", c)
 	return c, nil
 }
 
@@ -58,14 +65,14 @@ func getAESKeys(log *zap.SugaredLogger,
 	keyMap, err := aes.ReadKeys(privKey, inPath)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("encryptdir.Run: aes.ReadKeys: %w", err)
+			return nil, fmt.Errorf("encryptdir.getAESKeys: aes.ReadKeys: %w", err)
 		}
 
 		log.Info("No AES keys found, generating them...")
 
 		keyList, err := aes.GenKeyList(keySize, len(fileList))
 		if err != nil {
-			return nil, fmt.Errorf("encryptdir.Run: aes.GenKeyList: %w", err)
+			return nil, fmt.Errorf("encryptdir.getAESKeys: aes.GenKeyList: %w", err)
 		}
 
 		keyMap = make(map[string][]byte)

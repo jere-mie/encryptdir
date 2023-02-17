@@ -16,6 +16,8 @@ import (
 	"github.com/prairir/encryptdir/pkg/rsa"
 )
 
+const SIGNATURE_SIZE = 256
+
 // aes.GenKeyList: Generates a list of `keySize` sized keys
 // if keySize random keys of random size
 func GenKeyList(keySize uint64, length int) ([][]byte, error) {
@@ -87,12 +89,26 @@ func WriteKeys(keyMap map[string][]byte, privKey *gorsa.PrivateKey, outpath stri
 
 	payload = append(signature, payload...)
 
-	payload, err = gorsa.EncryptOAEP(crypto.MD5.New(), rand.Reader, &privKey.PublicKey, payload, []byte("keys"))
-	if err != nil {
-		return fmt.Errorf("aes.WriteKeys: gorsa.EncryptOAEP: %w", err)
+	// ripped from
+	// https://stackoverflow.com/questions/62348923/rs256-message-too-long-for-rsa-public-key-size-error-signing-jwt
+	step := privKey.PublicKey.Size() - 2*crypto.MD5.Size() - 2
+	var encryptedBytes []byte
+
+	for start := 0; start < len(payload); start += step {
+		finish := start + step
+		if finish > len(payload) {
+			finish = len(payload)
+		}
+
+		encryptedBlockBytes, err := gorsa.EncryptOAEP(crypto.MD5.New(), rand.Reader, &privKey.PublicKey, payload[start:finish], []byte("keys"))
+		if err != nil {
+			return fmt.Errorf("aes.WriteKeys: gorsa.EncryptOAEP: %w", err)
+		}
+
+		encryptedBytes = append(encryptedBytes, encryptedBlockBytes...)
 	}
 
-	_, err = out.Write(payload)
+	_, err = out.Write(encryptedBytes)
 	if err != nil {
 		return fmt.Errorf("aes.WriteKeys: out.Write: %w", err)
 	}
@@ -112,19 +128,35 @@ func ReadKeys(privKey *gorsa.PrivateKey, inpath string) (map[string][]byte, erro
 		return nil, fmt.Errorf("aes.ReadKeys: io.ReadAll: %w", err)
 	}
 
-	payload, err := gorsa.DecryptOAEP(crypto.MD5.New(), rand.Reader, privKey, encPayload, []byte("keys"))
-	if err != nil {
-		return nil, fmt.Errorf("aes.ReadKeys: gorsa.DecryptOAEP: %w", err)
-	}
+	// ripped from
+	// https://stackoverflow.com/questions/62348923/rs256-message-too-long-for-rsa-public-key-size-error-signing-jwt
+	msgLen := len(encPayload)
+	step := privKey.PublicKey.Size()
+	var decryptedBytes []byte
 
-	sig := payload[:128]
-	err = rsa.VerifySignature(&privKey.PublicKey, sig, payload[128:], crypto.MD5)
+	for start := 0; start < msgLen; start += step {
+		finish := start + step
+		if finish > msgLen {
+			finish = msgLen
+		}
+
+		decryptedBlockBytes, err := gorsa.DecryptOAEP(crypto.MD5.New(), rand.Reader, privKey, encPayload[start:finish], []byte("keys"))
+		if err != nil {
+			return nil, err
+		}
+
+		decryptedBytes = append(decryptedBytes, decryptedBlockBytes...)
+	}
+	payload := decryptedBytes
+
+	sig := payload[:SIGNATURE_SIZE] // because rsa is 2048 sized
+	err = rsa.VerifySignature(&privKey.PublicKey, sig, payload[SIGNATURE_SIZE:], crypto.MD5)
 	if err != nil {
 		return nil, fmt.Errorf("aes.ReadKeys: rsa.VerifySignature: %w", err)
 	}
 
 	// get rid of signature
-	payload = payload[:128]
+	payload = payload[SIGNATURE_SIZE:]
 
 	keyMap := make(map[string][]byte)
 	err = json.Unmarshal(payload, &keyMap)
