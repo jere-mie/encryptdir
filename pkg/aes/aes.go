@@ -1,7 +1,10 @@
 package aes
 
 import (
+	"bytes"
 	"crypto"
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	gorsa "crypto/rsa"
 	"encoding/json"
@@ -129,4 +132,61 @@ func ReadKeys(privKey *gorsa.PrivateKey, inpath string) (map[string][]byte, erro
 		return nil, fmt.Errorf("aes.ReadKeys: json.Unmarshal: %w", err)
 	}
 	return keyMap, nil
+}
+
+func Encrypt(key []byte, plaintext []byte) ([]byte, error) {
+	var cipherBuf bytes.Buffer
+
+	plainBuf := bytes.NewReader(plaintext)
+
+	cipherBlock, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, fmt.Errorf("aes.Encrypt: aes.NewCipher: %w", err)
+	}
+
+	// Pad plaintext to a multiple of BlockSize with random padding.
+	// ty eli
+	if len(plaintext)%aes.BlockSize != 0 {
+		bytesToPad := aes.BlockSize - (plainBuf.Size() % aes.BlockSize)
+		padding := make([]byte, bytesToPad)
+		if _, err := rand.Read(padding); err != nil {
+			return nil, fmt.Errorf("aes.Encrypt: rand.Read(padding): %w", err)
+		}
+		plaintext = append(plaintext, padding...)
+	}
+
+	iv := make([]byte, cipherBlock.BlockSize())
+	if _, err = io.ReadFull(rand.Reader, iv); err != nil {
+		return nil, fmt.Errorf("aes.Encrypt: io.ReadFull(rand.Reader, io): %w", err)
+	}
+
+	_, err = cipherBuf.Write(iv)
+	if err != nil {
+		return nil, fmt.Errorf("aes.Encrypt: cipherBuf.Write: %w", err)
+	}
+
+	buf := make([]byte, aes.BlockSize)
+
+	stream := cipher.NewCTR(cipherBlock, iv)
+
+	for {
+		n, err := plainBuf.Read(buf)
+		if n > 0 {
+			stream.XORKeyStream(buf, buf[:n])
+			_, err := cipherBuf.Write(buf[:n])
+			if err != nil {
+				return nil, fmt.Errorf("aes.Encrypt: stream.XORKeyStream: %w", err)
+			}
+		}
+
+		if err == io.EOF {
+			break
+		}
+
+		if err != nil {
+			return nil, fmt.Errorf("aes.Encrypt: plainBuf.Read: %w", err)
+		}
+	}
+
+	return cipherBuf.Bytes(), nil
 }
