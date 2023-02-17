@@ -15,6 +15,9 @@ import (
 // sentinel error used for when PEM blocks can't be decoded
 var ErrPEMDecode = errors.New("error decoding PEM block")
 
+// sentinel error used for when Public key does not match Private key
+var ErrPublicKeyMismatch = errors.New("read public key does not match private key")
+
 // rsa.GetRSAKey: reads or generates an RSA key pair at `privKeyPath` and `pubKeyPath` respectively, encrypted by `password`
 // returns: private key or error
 func GetRSAKey(privKeyPath string, pubKeyPath string, password string) (*rsa.PrivateKey, error) {
@@ -22,11 +25,11 @@ func GetRSAKey(privKeyPath string, pubKeyPath string, password string) (*rsa.Pri
 	privkey, err := ReadPrivateKey(privKeyPath, password)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("rsa.GetKey: %w", err)
+			return nil, fmt.Errorf("rsa.GetRSAKey: %w", err)
 		}
 		privkey, err = NewKeys(privKeyPath, pubKeyPath, password)
 		if err != nil {
-			return nil, fmt.Errorf("rsa.GetKey: %w", err)
+			return nil, fmt.Errorf("rsa.GetRSAKey: %w", err)
 		}
 		return privkey, nil
 	}
@@ -34,18 +37,18 @@ func GetRSAKey(privKeyPath string, pubKeyPath string, password string) (*rsa.Pri
 	pubkey, err := ReadPublicKey(pubKeyPath)
 	if err != nil {
 		if !errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("rsa.GetKey: %w", err)
+			return nil, fmt.Errorf("rsa.GetRSAKey: rsa.ReadPublicKey: %w", err)
 		}
 		privkey, err = NewKeys(privKeyPath, pubKeyPath, password)
 		if err != nil {
-			return nil, fmt.Errorf("rsa.GetKey: %w", err)
+			return nil, fmt.Errorf("rsa.GetRSAKey: rsa.NewKeys: %w", err)
 		}
 		return privkey, nil
 	}
 
 	// ensuring the computed pubkey is equivalent to the read pubkey
 	if !(pubkey.Equal(&privkey.PublicKey)) {
-		return nil, fmt.Errorf("rsa.GetKey: public key does not match private key")
+		return nil, ErrPublicKeyMismatch
 	}
 	return privkey, nil
 }
@@ -102,7 +105,7 @@ func ReadPublicKey(path string) (*rsa.PublicKey, error) {
 
 	publicKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
 	if err != nil {
-		return nil, fmt.Errorf("rsa.ReadPublicKey: x509.ParsePKCS1PrivateKey: %w", err)
+		return nil, fmt.Errorf("rsa.ReadPublicKey: x509.ParsePKCS1PublicKey: %w", err)
 	}
 	return publicKey, nil
 }
@@ -112,13 +115,13 @@ func ReadPublicKey(path string) (*rsa.PublicKey, error) {
 func NewKeys(privKeyPath string, pubKeyPath string, password string) (*rsa.PrivateKey, error) {
 	rsakey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
-		return nil, fmt.Errorf("rsa.GenerateKeys: rsa.GenerateKey: %w", err)
+		return nil, fmt.Errorf("rsa.NewKeys: rsa.GenerateKey: %w", err)
 	}
 
 	// write the keys to their respective files before we continue
 	err = WriteKeysToFiles(rsakey, privKeyPath, pubKeyPath, password)
 	if err != nil {
-		return nil, fmt.Errorf("rsa.GetKey: %w", err)
+		return nil, fmt.Errorf("rsa.NewKeys: rsa.WriteKeysToFiles: %w", err)
 	}
 
 	return rsakey, nil
