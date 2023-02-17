@@ -1,21 +1,20 @@
 package encryptdir
 
 import (
-	"crypto/rand"
-	"crypto/rsa"
+	gorsa "crypto/rsa"
 	"errors"
 	"fmt"
 	"os"
 
 	"github.com/prairir/encryptdir/pkg/aes"
 	"github.com/prairir/encryptdir/pkg/config"
-
+	"github.com/prairir/encryptdir/pkg/rsa"
 	"go.uber.org/zap"
 )
 
 func Run(log *zap.SugaredLogger, configPath string, password string, decrypt bool) error {
 
-	_, err := Startup(log, configPath)
+	_, err := Startup(log, configPath, password)
 	if err != nil {
 		return fmt.Errorf("encryptdir.Run: encryptdir.Startup: %w", err)
 	}
@@ -28,15 +27,15 @@ func Run(log *zap.SugaredLogger, configPath string, password string, decrypt boo
 	return nil
 }
 
-func Startup(log *zap.SugaredLogger, configPath string) (*config.Config, error) {
+func Startup(log *zap.SugaredLogger, configPath string, password string) (*config.Config, error) {
 	c, err := config.New(configPath)
 	if err != nil {
 		return nil, fmt.Errorf("encryptdir.Run: config.New: %w", err)
 	}
 
-	rsakey, err := rsa.GenerateKey(rand.Reader, 2048)
+	rsakey, err := rsa.GetRSAKey(c.PrivateKeyFile, c.PublicKeyFile, password)
 	if err != nil {
-		return nil, fmt.Errorf("encryptdir.Run: rsa.GenerateKey: %w", err)
+		return nil, fmt.Errorf("encryptdir.Run: rsa.GetRSAKey: %w", err)
 	}
 
 	c.RSAKey = rsakey
@@ -51,7 +50,7 @@ func Startup(log *zap.SugaredLogger, configPath string) (*config.Config, error) 
 
 // encryptdir.getAESKeys: read aes keys from file or generate em
 func getAESKeys(log *zap.SugaredLogger,
-	privKey *rsa.PrivateKey,
+	privKey *gorsa.PrivateKey,
 	inPath string,
 	keySize uint64,
 	fileList []string) (map[string][]byte, error) {
@@ -62,7 +61,7 @@ func getAESKeys(log *zap.SugaredLogger,
 			return nil, fmt.Errorf("encryptdir.Run: aes.ReadKeys: %w", err)
 		}
 
-		log.Info("No keys found, generating them...")
+		log.Info("No AES keys found, generating them...")
 
 		keyList, err := aes.GenKeyList(keySize, len(fileList))
 		if err != nil {

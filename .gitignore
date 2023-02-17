@@ -1,1 +1,3 @@
 .tool-versions
+*.pem
+config.yml
