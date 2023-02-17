@@ -12,6 +12,9 @@ import (
 	"os"
 )
 
+// sentinel error used for when PEM blocks can't be decoded
+var ErrPEMDecode = errors.New("error decoding PEM block")
+
 // rsa.GetRSAKey: reads or generates an RSA key pair at `privKeyPath` and `pubKeyPath` respectively, encrypted by `password`
 // returns: private key or error
 func GetRSAKey(privKeyPath string, pubKeyPath string, password string) (*rsa.PrivateKey, error) {
@@ -63,7 +66,7 @@ func ReadPrivateKey(path string, password string) (*rsa.PrivateKey, error) {
 
 	block, _ := pem.Decode(encPayload)
 	if block == nil {
-		return nil, fmt.Errorf("rsa.ReadPrivateKey: pem.Decode: no private key found")
+		return nil, ErrPEMDecode
 	}
 
 	decrypted, err := x509.DecryptPEMBlock(block, []byte(password))
@@ -94,7 +97,7 @@ func ReadPublicKey(path string) (*rsa.PublicKey, error) {
 
 	block, _ := pem.Decode(encPayload)
 	if block == nil {
-		return nil, fmt.Errorf("rsa.ReadPublicKey: pem.Decode: no public key found")
+		return nil, ErrPEMDecode
 	}
 
 	publicKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
