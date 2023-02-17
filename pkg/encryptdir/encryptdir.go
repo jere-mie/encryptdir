@@ -33,7 +33,7 @@ func Startup(log *zap.SugaredLogger, configPath string, password string) (*confi
 		return nil, fmt.Errorf("encryptdir.Run: config.New: %w", err)
 	}
 
-	rsakey, err := rsa.GetKey(c.PrivateKeyFile, c.PublicKeyFile, password)
+	rsakey, err := rsa.GetRSAKey(c.PrivateKeyFile, c.PublicKeyFile, password)
 	if err != nil {
 		return nil, fmt.Errorf("encryptdir.Run: rsa.GetKey: %w", err)
 	}

@@ -6,16 +6,21 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 )
 
-func GetKey(privKeyPath string, pubKeyPath string, password string) (*rsa.PrivateKey, error) {
-
+// rsa.GetRSAKey: reads or generates an RSA key pair at `privKeyPath` and `pubKeyPath` respectively, encrypted by `password`
+// returns: private key or error
+func GetRSAKey(privKeyPath string, pubKeyPath string, password string) (*rsa.PrivateKey, error) {
 	// try reading the private key
 	privkey, err := ReadPrivateKey(privKeyPath, password)
 	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("rsa.GetKey: %w", err)
+		}
 		privkey, err = NewKeys(privKeyPath, pubKeyPath, password)
 		if err != nil {
 			return nil, fmt.Errorf("rsa.GetKey: %w", err)
@@ -25,6 +30,9 @@ func GetKey(privKeyPath string, pubKeyPath string, password string) (*rsa.Privat
 	// try reading the public key
 	pubkey, err := ReadPublicKey(pubKeyPath)
 	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return nil, fmt.Errorf("rsa.GetKey: %w", err)
+		}
 		privkey, err = NewKeys(privKeyPath, pubKeyPath, password)
 		if err != nil {
 			return nil, fmt.Errorf("rsa.GetKey: %w", err)
@@ -39,6 +47,8 @@ func GetKey(privKeyPath string, pubKeyPath string, password string) (*rsa.Privat
 	return privkey, nil
 }
 
+// rsa.ReadPrivateKey: reads and decodes an RSA private key at `path`, encrypted by `password`
+// returns: private key or error
 func ReadPrivateKey(path string, password string) (*rsa.PrivateKey, error) {
 	in, err := os.OpenFile(path, os.O_RDONLY, 0644)
 	if err != nil {
@@ -68,6 +78,8 @@ func ReadPrivateKey(path string, password string) (*rsa.PrivateKey, error) {
 	return privateKey, nil
 }
 
+// rsa.ReadPublicKey: reads and decodes an RSA public key at `path`
+// returns: public key or error
 func ReadPublicKey(path string) (*rsa.PublicKey, error) {
 	in, err := os.OpenFile(path, os.O_RDONLY, 0644)
 	if err != nil {
@@ -92,6 +104,8 @@ func ReadPublicKey(path string) (*rsa.PublicKey, error) {
 	return publicKey, nil
 }
 
+// rsa.NewKeys: generates private/public key, encrypted with `password`, and writes them to `privPath` and `pubPath` respectively
+// returns: private key or error
 func NewKeys(privKeyPath string, pubKeyPath string, password string) (*rsa.PrivateKey, error) {
 	rsakey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -107,6 +121,8 @@ func NewKeys(privKeyPath string, pubKeyPath string, password string) (*rsa.Priva
 	return rsakey, nil
 }
 
+// rsa.WriteKeysToFiles: writes `privatekey` to `privPath` and `privatekey.PublicKey` to `pubPath`
+// returns: error
 func WriteKeysToFiles(privateKey *rsa.PrivateKey, privPath string, pubPath string, password string) error {
 	// create file, error if already exist
 	outPriv, err := os.OpenFile(privPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
