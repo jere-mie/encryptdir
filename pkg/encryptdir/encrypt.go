@@ -27,10 +27,6 @@ func encrypt(log *zap.SugaredLogger,
 
 	errC := make(chan error, 0)
 
-	// TODO: proper error handling
-	// errgroup only returns the first error(uses `sync.Once`) while cwalk.Walk returns
-	// an list of errors with error type interface
-	// maybe read and merge a bunch of error channels, it would be *ok* but it would work
 	for _, dir := range directories {
 		go func(dir string) { errC <- cwalk.Walk(dir, w.encryptWalk) }(dir)
 	}
@@ -62,7 +58,7 @@ type Walker struct {
 
 func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 	if err != nil {
-		return nil // TODO: figure out if right
+		return nil
 	}
 
 	errC := make(chan error, 1)
@@ -77,7 +73,7 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			// if `.enc` file already exists, another goroutine is touching
 			// the file, so move on
-			if errors.Is(err, os.ErrNotExist) {
+			if errors.Is(err, os.ErrExist) {
 				errChan <- nil
 				return
 			}
