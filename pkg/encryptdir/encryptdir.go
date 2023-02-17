@@ -9,12 +9,13 @@ import (
 
 	"github.com/prairir/encryptdir/pkg/aes"
 	"github.com/prairir/encryptdir/pkg/config"
+
 	"go.uber.org/zap"
 )
 
 func Run(log *zap.SugaredLogger, configPath string, password string, decrypt bool) error {
 
-	_, err := Startup(configPath)
+	_, err := Startup(log, configPath)
 	if err != nil {
 		return fmt.Errorf("encryptdir.Run: encryptdir.Startup: %w", err)
 	}
