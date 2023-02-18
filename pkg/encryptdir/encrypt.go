@@ -15,19 +15,20 @@ import (
 	"go.uber.org/zap"
 )
 
-func encrypt(log *zap.SugaredLogger,
+func encryptDirectories(log *zap.SugaredLogger,
 	privKey *gorsa.PrivateKey,
 	keyMap map[string][]byte,
 	directories []string,
 ) error {
-	w := Walker{
-		privKey: privKey,
-		keyMap:  keyMap,
-	}
 
 	errC := make(chan error, 0)
 
 	for _, dir := range directories {
+		w := Walker{
+			privKey:   privKey,
+			keyMap:    keyMap,
+			startPath: dir,
+		}
 		go func(dir string) { errC <- cwalk.Walk(dir, w.encryptWalk) }(dir)
 	}
 
@@ -52,8 +53,9 @@ func encrypt(log *zap.SugaredLogger,
 
 type Walker struct {
 	privKey *gorsa.PrivateKey
+	keyMap  map[string][]byte
 
-	keyMap map[string][]byte
+	startPath string
 }
 
 func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
@@ -62,14 +64,24 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 	}
 
 	errC := make(chan error, 1)
-	go func(path string, info os.FileInfo, privKey *gorsa.PrivateKey, keyMap map[string][]byte, errChan chan error) {
+	go func(startPath string, path string, info os.FileInfo, privKey *gorsa.PrivateKey, keyMap map[string][]byte, errChan chan error) {
 		// dont touch dirs
 		if info.IsDir() {
 			errChan <- nil
 			return
 		}
 
-		encFile, err := os.OpenFile(path+".enc", os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode())
+		ext := filepath.Ext(path)
+		key, ok := keyMap[ext[1:]] // get rid of `.` in extension
+		// skip this file if not in key map
+		if !ok {
+			errChan <- nil
+			return
+		}
+
+		fullPath := filepath.Join(startPath, path)
+
+		encFile, err := os.OpenFile(fullPath+".enc", os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode())
 		if err != nil {
 			// if `.enc` file already exists, another goroutine is touching
 			// the file, so move on
@@ -83,20 +95,12 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 		}
 		defer encFile.Close()
 
-		plainFile, err := os.OpenFile(path, os.O_RDONLY, info.Mode())
+		plainFile, err := os.OpenFile(fullPath, os.O_RDONLY, info.Mode())
 		if err != nil {
 			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: os.OpenFile: %w", err)
 			return
 		}
 		defer plainFile.Close()
-
-		ext := filepath.Ext(path)
-		key, ok := keyMap[ext]
-		// skip this file if not in key map
-		if !ok {
-			errChan <- nil
-			return
-		}
 
 		sig := make([]byte, crypto.MD5.Size())
 		_, err = plainFile.Read(sig)
@@ -129,6 +133,8 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 			return
 		}
 
+		plain = append(sig, plain...)
+
 		cipher, err := aes.Encrypt(key, plain)
 		if err != nil {
 			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: aes.Encrypt: %w", err)
@@ -141,19 +147,19 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 			return
 		}
 
-		err = os.Rename(path+".enc", path)
+		err = os.Rename(fullPath+".enc", fullPath)
 		if err != nil {
 			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: os.Rename: %w", err)
 			return
 		}
 
 		errChan <- nil
-	}(path, info, w.privKey, w.keyMap, errC)
+	}(w.startPath, path, info, w.privKey, w.keyMap, errC)
 
 	err = <-errC
 	close(errC)
 	if err != nil {
-		return fmt.Errorf("encryptdir.Walker.walk: path = %q: %w", path, err)
+		return fmt.Errorf("encryptdir.Walker.walk: path = %q: %w", filepath.Join(w.startPath, path), err)
 	}
 	return nil
 }

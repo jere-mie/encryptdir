@@ -179,8 +179,8 @@ func Encrypt(key []byte, plaintext []byte) ([]byte, error) {
 
 	// Pad plaintext to a multiple of BlockSize with random padding.
 	// ty eli
-	if len(plaintext)%aes.BlockSize != 0 {
-		bytesToPad := aes.BlockSize - (plainBuf.Size() % aes.BlockSize)
+	if plainBuf.Len()%aes.BlockSize != 0 {
+		bytesToPad := aes.BlockSize - (plainBuf.Len() % aes.BlockSize)
 		padding := make([]byte, bytesToPad)
 		if _, err := rand.Read(padding); err != nil {
 			return nil, fmt.Errorf("aes.Encrypt: rand.Read(padding): %w", err)
@@ -248,7 +248,7 @@ func Decrypt(key []byte, ciphertext []byte) ([]byte, error) {
 
 	iv := make([]byte, cipherBlock.BlockSize())
 	if _, err := cipherBuf.Read(iv); err != nil {
-		return nil, fmt.Errorf("aes.Decrypt: io.ReadFull(rand.Reader, io): %w", err)
+		return nil, fmt.Errorf("aes.Decrypt: cipherBuf.Read: %w", err)
 	}
 
 	buf := make([]byte, aes.BlockSize)
@@ -275,5 +275,4 @@ func Decrypt(key []byte, ciphertext []byte) ([]byte, error) {
 	}
 
 	return plainBuf.Bytes()[:origSize], nil // TODO: this may not be right, verify number
-
 }
