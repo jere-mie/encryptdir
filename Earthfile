@@ -46,3 +46,14 @@ use-image:
     RUN --interactive bash
 
     SAVE IMAGE encryptdir-interactive:latest
+
+test:
+    FROM +build-image-base
+
+    COPY ./scripts/create_test_files.sh .
+
+    RUN ./create_test_files.sh
+
+    RUN ./encryptdir -password="hi"
+
+    RUN --interactive bash
