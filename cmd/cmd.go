@@ -26,10 +26,6 @@ func Run() error {
 
 	zlog := log.New(*quiet)
 
-	if !(*quiet) {
-		fmt.Printf("hi: %v\n", *quiet)
-	}
-
 	// getting password if it isn't passed in
 	if len(*password) == 0 {
 		fmt.Print("Enter Password: ")
