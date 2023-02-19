@@ -35,7 +35,7 @@ build-image-base:
 
     COPY +build-bin/$BIN_NAME .
 
-    COPY config.yml .
+    COPY config.yml ./config.yml
 
 # puts you in interactive shell inside container,
 # spits out image of that container
@@ -54,6 +54,6 @@ test:
 
     RUN ./create_test_files.sh
 
-    RUN ./encryptdir -password="hi"
+    RUN apt update && apt install xxd
 
     RUN --interactive bash

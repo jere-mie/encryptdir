@@ -177,21 +177,21 @@ func Encrypt(key []byte, plaintext []byte) ([]byte, error) {
 		return nil, fmt.Errorf("aes.Encrypt: aes.NewCipher: %w", err)
 	}
 
+	origSize := uint64(plainBuf.Size())
+	err = binary.Write(&cipherBuf, binary.LittleEndian, &origSize)
+	if err != nil {
+		return nil, fmt.Errorf("aes.Encrypt: binary.Write: %w", err)
+	}
+
 	// Pad plaintext to a multiple of BlockSize with random padding.
 	// ty eli
-	if plainBuf.Len()%aes.BlockSize != 0 {
-		bytesToPad := aes.BlockSize - (plainBuf.Len() % aes.BlockSize)
+	if plainBuf.Size()%aes.BlockSize != 0 {
+		bytesToPad := aes.BlockSize - (plainBuf.Size() % aes.BlockSize)
 		padding := make([]byte, bytesToPad)
 		if _, err := rand.Read(padding); err != nil {
 			return nil, fmt.Errorf("aes.Encrypt: rand.Read(padding): %w", err)
 		}
-		plaintext = append(plaintext, padding...)
-	}
-
-	origSize := uint64(len(plaintext))
-	err = binary.Write(&cipherBuf, binary.LittleEndian, &origSize)
-	if err != nil {
-		return nil, fmt.Errorf("aes.Encrypt: binary.Write: %w", err)
+		plainBuf = bytes.NewReader(append(plaintext, padding...))
 	}
 
 	iv := make([]byte, cipherBlock.BlockSize())
@@ -274,5 +274,5 @@ func Decrypt(key []byte, ciphertext []byte) ([]byte, error) {
 		}
 	}
 
-	return plainBuf.Bytes()[:origSize], nil // TODO: this may not be right, verify number
+	return plainBuf.Bytes()[:origSize], nil
 }

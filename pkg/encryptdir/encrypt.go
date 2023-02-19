@@ -102,12 +102,13 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 		}
 		defer plainFile.Close()
 
-		sig := make([]byte, crypto.MD5.Size())
-		_, err = plainFile.Read(sig)
+		plain, err := io.ReadAll(plainFile)
 		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: plainFile.Read: %w", err)
+			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: io.ReadAll: %w", err)
 			return
 		}
+
+		sig := plain[:aes.SIGNATURE_SIZE]
 
 		err = rsa.VerifySignature(&privKey.PublicKey, sig, key, crypto.MD5)
 		if err == nil { // means signature verified and already encrypted
@@ -126,14 +127,6 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: encFile.Write(wSig): %w", err)
 			return
 		}
-
-		plain, err := io.ReadAll(plainFile)
-		if err != nil {
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: io.ReadAll: %w", err)
-			return
-		}
-
-		plain = append(sig, plain...)
 
 		cipher, err := aes.Encrypt(key, plain)
 		if err != nil {

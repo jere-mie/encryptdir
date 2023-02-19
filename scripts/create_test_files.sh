@@ -21,7 +21,7 @@ echo hello from file.txt > ./testing_env/Downloads/file.txt
 # making Pictures
 mkdir -p ./testing_env/Pictures
 echo hello from file.exe > ./testing_env/Pictures/file.exe
-echo hello from file.docx > ./testing_env/Pictures/file.docx
+echo hello from file.docx hi > ./testing_env/Pictures/file.docx
 echo hello from file.pdf > ./testing_env/Pictures/file.pdf
 echo hello from file.xlsx > ./testing_env/Pictures/file.xlsx
 echo hello from file.output > ./testing_env/Pictures/file.output
