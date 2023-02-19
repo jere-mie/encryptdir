@@ -1,4 +1,4 @@
-key_size: 128
+key_size: 256
 public_key: "private.pem" # file to store public key
 private_key: "public.pem" # file to store private key
 aes_key: "aes_keys_chain.bin" # the AES key is encrypted using the private key
