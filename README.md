@@ -2,7 +2,7 @@
 
 (pronounced encrypter)
 
-A simple Python application to securely encrypt and decrypt specified files in specified directories.  
+A simple Golang application to securely encrypt and decrypt specified files in specified directories.  
 Created for assignment 1 of COMP-3750 at the University of Windsor, Winter 2023 by Jeremie Bornais and Ryan Prairie
 
 ## Requirements
@@ -87,3 +87,7 @@ If you use [Earthly](https://earthly.dev/), you can use it to build our applicat
 ### For Testing
 
 `earthly +build-test`
+
+## Disclaimer
+
+You should only ever run this application in a virtual machine or container to ensure safety! This application was made and should only be used for educational purposes.
