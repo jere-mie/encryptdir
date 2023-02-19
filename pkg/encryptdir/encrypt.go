@@ -81,20 +81,6 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 
 		fullPath := filepath.Join(startPath, path)
 
-		encFile, err := os.OpenFile(fullPath+".enc", os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode())
-		if err != nil {
-			// if `.enc` file already exists, another goroutine is touching
-			// the file, so move on
-			if errors.Is(err, os.ErrExist) {
-				errChan <- nil
-				return
-			}
-
-			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: os.OpenFile: %w", err)
-			return
-		}
-		defer encFile.Close()
-
 		plainFile, err := os.OpenFile(fullPath, os.O_RDONLY, info.Mode())
 		if err != nil {
 			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: os.OpenFile: %w", err)
@@ -121,6 +107,20 @@ func (w Walker) encryptWalk(path string, info os.FileInfo, err error) error {
 			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: rsa.CreateSignature: %w", err)
 			return
 		}
+
+		encFile, err := os.OpenFile(fullPath+".enc", os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode())
+		if err != nil {
+			// if `.enc` file already exists, another goroutine is touching
+			// the file, so move on
+			if errors.Is(err, os.ErrExist) {
+				errChan <- nil
+				return
+			}
+
+			errChan <- fmt.Errorf("encryptdir.Walker.encryptWalk: os.OpenFile: %w", err)
+			return
+		}
+		defer encFile.Close()
 
 		_, err = encFile.Write(wSig)
 		if err != nil {

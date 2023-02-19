@@ -74,20 +74,6 @@ func (w Walker) decryptWalk(path string, info os.FileInfo, err error) error {
 
 		fullPath := filepath.Join(startPath, path)
 
-		decFile, err := os.OpenFile(fullPath+".dec", os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode())
-		if err != nil {
-			// if `.dec` file already exists, another goroutine is touchine
-			// so move on
-			if errors.Is(err, os.ErrExist) {
-				errChan <- nil
-				return
-			}
-
-			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk: os.OpenFile: %w", err)
-			return
-		}
-		defer decFile.Close()
-
 		cipherFile, err := os.OpenFile(fullPath, os.O_RDONLY, info.Mode())
 		if err != nil {
 			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk: os.OpenFile: %w", err)
@@ -119,6 +105,20 @@ func (w Walker) decryptWalk(path string, info os.FileInfo, err error) error {
 			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk: aes.Decrypt: %w", err)
 			return
 		}
+
+		decFile, err := os.OpenFile(fullPath+".dec", os.O_WRONLY|os.O_CREATE|os.O_EXCL, info.Mode())
+		if err != nil {
+			// if `.dec` file already exists, another goroutine is touchine
+			// so move on
+			if errors.Is(err, os.ErrExist) {
+				errChan <- nil
+				return
+			}
+
+			errChan <- fmt.Errorf("encryptdir.Walker.decryptWalk: os.OpenFile: %w", err)
+			return
+		}
+		defer decFile.Close()
 
 		_, err = decFile.Write(plain)
 		if err != nil {
